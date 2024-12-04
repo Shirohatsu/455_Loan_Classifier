@@ -5,6 +5,8 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from tqdm import tqdm
+import numpy as np
+import matplotlib.pyplot as plt
 
 
 def pre_process(gender_map, eduction_map, home_ownership_map, loan_intent_map, previous_loan_defaults_on_file, scaler):
@@ -38,9 +40,12 @@ def model_preparation(X, Y):
     test_Y_tensor = torch.FloatTensor(test_Y).unsqueeze(1)
     return train_X_tensor, train_Y_tensor, test_X_tensor, test_Y_tensor
 
+# From pytorch doc https://pytorch.org/tutorials/beginner/basics/quickstart_tutorial.html
 
 def train(model, X_train, Y_train, epochs, loss_function, optimizer):
-
+    number_of_epoch = []
+    number_of_correct_guess = []
+    loss_rate = []
     for epoch in tqdm(range(epochs)):
 
         outputs = model(X_train)
@@ -49,22 +54,40 @@ def train(model, X_train, Y_train, epochs, loss_function, optimizer):
         loss.backward()
         optimizer.step()
 
-        # if (epoch + 1) % 10 == 0:
-        #     print(f'Epoch [{epoch + 1}/{epochs}], Loss: {loss.item():.4f}')
+        if epoch % 100 == 0:
+            correct_guess = 0
+            for index, value in enumerate(outputs):
+                prediction = 1 if value > 0.5 else 0
+                if prediction == Y_train[index]:
+                    correct_guess += 1
+            number_of_correct_guess.append(correct_guess / len(Y_train))
+            number_of_epoch.append(epoch)
+
+    print(f"Final Accuracy {number_of_correct_guess[-1]}")
+    plt.plot(number_of_epoch, number_of_correct_guess, loss_rate)
+    plt.xlabel("# of Epochs")
+    plt.ylabel("Accuracy")
+    plt.title("Accuracy vs # of Epochs")
+    plt.show()
 
     return model
 
-
+# From the same pytorch Doc
 def evaluation(model, X_test, Y_test):
 
     model.eval()
-    with torch.no_grad():
-        predictions = model(X_test)
-        predicted_labels = (predictions > 0.5).float()
-        accuracy = (predicted_labels == Y_test).float().mean()
-        print(f'Test Accuracy: {accuracy.item():.4f}')
+    correct = 0
 
-    return predictions
+    with torch.no_grad():
+
+        for index, value in enumerate(X_test):
+            prediction = 1 if model.forward(value) > 0.5 else 0
+            if prediction == Y_test[index]:
+                correct += 1
+
+    print(f"Accuracy {correct / len(X_test)}")
+
+    return correct / len(X_test)
 
 
 
@@ -109,12 +132,13 @@ def main():
         model = model,
         X_train = train_x,
         Y_train = train_y,
-        epochs = 10_000,
+        epochs = 10_00,
         loss_function = nn.BCELoss(),
         optimizer = optim.Adam(model.parameters(), lr=0.001)
     )
 
     predictions = evaluation(
+
         model = model,
         X_test = test_x,
         Y_test = test_y
@@ -124,6 +148,4 @@ def main():
 
 if __name__ == '__main__':
 
-    print(torch.__version__)
-    print("CUDA available:", torch.cuda.is_available())
-    # main()
+    main()
